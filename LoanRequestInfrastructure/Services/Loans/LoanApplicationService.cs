@@ -137,6 +137,8 @@ namespace LoanRequestInfrastructure.Services.Loans
             if (application == null)
                 return BaseResponse.Failure<LoanApplicationDetailResponseDto>("Application not found or you do not have access to it.");
             var response = _mapper.Map<LoanApplicationDetailResponseDto>(application);
+            response.IsSuccess = true;
+            response.Message = " Loan Application found Successfully!";
             return response;
         }
 

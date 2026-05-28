@@ -28,6 +28,6 @@ namespace LoanRequestDomain.Entities
 
         // Navigation
         [ForeignKey("LoanApplicationId")]
-        public LoanApplication LoanApplication { get; set; }
+        public virtual required LoanApplication LoanApplication { get; set; }
     }
 }

@@ -7,6 +7,7 @@ using LoanRequestInfrastructure.Persistence.Repositories;
 using LoanRequestInfrastructure.Services.Applicants;
 using LoanRequestInfrastructure.Services.Auth;
 using LoanRequestInfrastructure.Services.BVN_NIN;
+using LoanRequestInfrastructure.Services.Files;
 using LoanRequestInfrastructure.Services.Loans;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -55,6 +56,8 @@ builder.Services.AddScoped<ILoanApplicationRepository, LoanApplicationRepository
 builder.Services.AddScoped<ILoanApplicationService, LoanApplicationService>();
 builder.Services.AddScoped<IDocumentRequirementRepository, DocumentRequirementRepository>();
 builder.Services.AddScoped<IDocumentChecklistService, DocumentChecklistService>();
+builder.Services.AddScoped<ILoanDocumentService, LoanDocumentService>();
+builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

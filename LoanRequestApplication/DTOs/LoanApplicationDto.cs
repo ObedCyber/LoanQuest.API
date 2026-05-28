@@ -138,7 +138,12 @@ namespace LoanRequestApplication.DTOs
 
     public class LoanDocumentUploadResponse : BaseResponse
     {
-
+        public Guid DocumentId { get; set; }          // The DB Primary Key of the new document
+        public string DocumentTypeCode { get; set; }  // e.g., "PAYSLIP" (for frontend matching logic)
+        public string DocumentTypeName { get; set; }  // e.g., "Last 3 Months Payslip" (for UI text display)
+        public string FileName { get; set; }          // Original file name (e.g., "march_payslip.pdf")
+        public string Status { get; set; }            // e.g., "Pending"
+        public DateTime UploadedAt { get; set; }      // Timestamp of creation
     }
 
     public class BlobUploadResult

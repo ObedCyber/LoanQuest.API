@@ -18,9 +18,8 @@ namespace LoanRequestInfrastructure.Services.Files
         private readonly BlobContainerClient _containerClient;
         private readonly BlobServiceClient _blobServiceClient;
 
-        public FileUploadService(IConfiguration configuration, BlobServiceClient blobServiceClient)
-        {
-            _blobServiceClient = blobServiceClient;
+        public FileUploadService(IConfiguration configuration)
+        {          
 
             var connectionString = configuration["AzureBlobStorage:ConnectionString"];
 
@@ -28,7 +27,7 @@ namespace LoanRequestInfrastructure.Services.Files
 
             _blobServiceClient = new BlobServiceClient(connectionString);
 
-            _containerClient =  blobServiceClient.GetBlobContainerClient(containerName);
+            _containerClient =  _blobServiceClient.GetBlobContainerClient(containerName);
 
             _containerClient.CreateIfNotExists(
                 PublicAccessType.None
