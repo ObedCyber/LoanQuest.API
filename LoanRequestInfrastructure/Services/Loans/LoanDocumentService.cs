@@ -179,6 +179,74 @@ namespace LoanRequestInfrastructure.Services.Loans
             }
         }
 
+        public async Task<LoanDocumentDeleteResponse> DeleteDocumentAsync(Guid loanApplicationId, Guid documentId)
+        {
+            if (loanApplicationId == Guid.Empty)
+            {
+                return BaseResponse.Failure<LoanDocumentDeleteResponse>(
+                    message: "Application ID cannot be empty");
+            }
+
+            if (documentId == Guid.Empty)
+            {
+                return BaseResponse.Failure<LoanDocumentDeleteResponse>(
+                    message: "Document ID cannot be empty");
+            }
+
+            var loanDocument = await _loanDocumentRepository.Query()
+                .Include(x => x.LoanApplication)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == documentId &&
+                    x.LoanApplicationId == loanApplicationId &&
+                    !x.IsDeleted);
+
+            if (loanDocument == null)
+            {
+                return BaseResponse.Failure<LoanDocumentDeleteResponse>(
+                    message: "Document not found");
+            }
+
+            if (loanDocument.Status == DocumentStatus.Verified)
+            {
+                return BaseResponse.Failure<LoanDocumentDeleteResponse>(
+                    message: "Verified documents cannot be deleted");
+            }
+
+            var checklist = await _checklistRepo.Query()
+                .FirstOrDefaultAsync(x =>
+                    x.LoanApplicationId == loanApplicationId &&
+                    x.DocumentTypeCode == loanDocument.DocumentTypeCode);
+
+            try
+            {
+                // Delete from Azure Blob
+                await _uploadService.DeleteDocumentAsync(
+                    loanDocument.StoragePath);
+
+                // Soft delete in DB
+                loanDocument.IsDeleted = true;
+
+                _loanDocumentRepository.Update(loanDocument);
+
+                // Reset checklist state
+                if (checklist != null)
+                {
+                    checklist.Status = ChecklistItemStatus.Pending;
+                    checklist.LoanDocumentId = null;
+                    checklist.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _loanDocumentRepository.SaveChangesAsync();
+
+                return BaseResponse.Success<LoanDocumentDeleteResponse>(
+                    "Document deleted successfully");
+            }
+            catch (Exception)
+            {
+                return BaseResponse.Failure<LoanDocumentDeleteResponse>(
+                    message: "Error deleting document");
+            }
+        }
         private async Task<ApplicationDocumentChecklist?> GetChecklistAsync(Guid loanApplicationId, string documentTypeCode)
         {
             return await _checklistRepo.Query()
@@ -197,7 +265,6 @@ namespace LoanRequestInfrastructure.Services.Loans
 
             return null;
         }
-
         private static string? ValidateFile(IFormFile file, ApplicationDocumentChecklist checklist)
         {
             var allowedExtensions = checklist.AllowedFileTypes
@@ -229,7 +296,6 @@ namespace LoanRequestInfrastructure.Services.Loans
 
             return null;
         }
-
         private static LoanDocumentUploadResponse Failure(string message)
         {
             return BaseResponse

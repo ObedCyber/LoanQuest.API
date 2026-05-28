@@ -1,7 +1,6 @@
 ﻿using LoanRequestApplication.DTOs;
 using LoanRequestApplication.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LoanRequestAPI.Controllers.Loans
@@ -71,11 +70,11 @@ namespace LoanRequestAPI.Controllers.Loans
         public async Task<IActionResult> GetLoanApplicationsForApplicant()
         {
             var response = await _loanApplicationService.GetAllLoanApplicationsForApplicant();
-            if(response.TotalCount == 0) return Ok(new { response.TotalCount, response.Applications });
+            if (response.TotalCount == 0) return Ok(new { response.TotalCount, response.Applications });
             return Ok(response);
         }
 
-        [HttpGet("applications/{id:guid}")] 
+        [HttpGet("applications/{id:guid}")]
         public async Task<IActionResult> GetApplicationDetail(Guid id)
         {
             var response = await _loanApplicationService.GetApplicationDetailAsync(id);
@@ -109,10 +108,18 @@ namespace LoanRequestAPI.Controllers.Loans
         public async Task<IActionResult> UploadDocument(Guid id, [FromForm] LoanDocumentUploadRequest request)
         {
             var result = await _loanDocumentService.ProcessLoanDocument(id, request);
-            if(!result.IsSuccess) return BadRequest(result);
+            if (!result.IsSuccess) return BadRequest(result);
 
             return Ok(result);
         }
 
+        [HttpDelete("applications/{id:guid}/documents/{docId:guid}")]
+        public async Task<IActionResult> DeleteDocument(Guid id, Guid docId)
+        {
+            var result = await _loanDocumentService.DeleteDocumentAsync(id, docId);
+            if (!result.IsSuccess) return BadRequest(result);
+
+            return Ok(result);
+        }
     }
 }

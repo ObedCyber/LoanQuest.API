@@ -31,7 +31,8 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-builder.Services.AddAutoMapper(cfg => {
+builder.Services.AddAutoMapper(cfg =>
+{
     cfg.AddMaps(typeof(ApplicantProfile).Assembly);
     cfg.AddMaps(typeof(EmploymentProfile).Assembly);
 });
@@ -90,7 +91,7 @@ builder.Services.AddSwaggerGen(options =>
                     Id = "Bearer"
                 }
             },
-            new string[] {}
+            Array.Empty<string>()
         }
     });
 });

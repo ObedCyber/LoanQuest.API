@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
 
 namespace LoanRequestApplication.DTOs
@@ -33,7 +28,7 @@ namespace LoanRequestApplication.DTOs
         public decimal MonthlyRepayment { get; set; }
         public decimal TotalRepayable { get; set; }
         public List<DocumentChecklistItemDto> DocumentChecklist { get; set; } = new();
-    
+
     }
 
     public class DocumentChecklistItemDto
@@ -49,10 +44,10 @@ namespace LoanRequestApplication.DTOs
     {
         public Guid Id { get; set; }
         public string ApplicationNumber { get; set; } = null!;
-        public string LoanProductName { get; set; } = null!; 
+        public string LoanProductName { get; set; } = null!;
         public decimal RequestedAmount { get; set; }
         public int TenorMonths { get; set; }
-        public string Status { get; set; } = null!; 
+        public string Status { get; set; } = null!;
         public DateTime SubmittedAt { get; set; }
     }
 
@@ -67,7 +62,7 @@ namespace LoanRequestApplication.DTOs
         public Guid Id { get; set; }
         public string ApplicationNumber { get; set; } = null!;
         public string Status { get; set; } = null!;
-        public string? StatusReason { get; set; } 
+        public string? StatusReason { get; set; }
 
         public string ProductName { get; set; } = null!;
         public string ProductCode { get; set; } = null!;
@@ -86,7 +81,7 @@ namespace LoanRequestApplication.DTOs
 
         public bool ConsentGiven { get; set; }
         public DateTime? ConsentAt { get; set; }
-        public string? BlacklistResult { get; set; } 
+        public string? BlacklistResult { get; set; }
     }
 
     public class LoanApplicationUpdateDto
@@ -146,6 +141,11 @@ namespace LoanRequestApplication.DTOs
         public DateTime UploadedAt { get; set; }      // Timestamp of creation
     }
 
+    public class LoanDocumentDeleteResponse : BaseResponse
+
+    {
+
+    }
     public class BlobUploadResult
     {
         public bool IsSuccess { get; set; }
