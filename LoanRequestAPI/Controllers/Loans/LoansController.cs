@@ -14,11 +14,13 @@ namespace LoanRequestAPI.Controllers.Loans
         private readonly ILoanProductService _loanProductService;
         private readonly IEligibilityEngine _eligibilityEngine;
         private readonly ILoanApplicationService _loanApplicationService;
-        public LoansController(ILoanProductService loanProductService, IEligibilityEngine eligibilityEngine, ILoanApplicationService loanApplicationService)
+        private readonly ILoanDocumentService _loanDocumentService;
+        public LoansController(ILoanProductService loanProductService, IEligibilityEngine eligibilityEngine, ILoanApplicationService loanApplicationService, ILoanDocumentService loanDocumentService)
         {
             _loanProductService = loanProductService;
             _eligibilityEngine = eligibilityEngine;
             _loanApplicationService = loanApplicationService;
+            _loanDocumentService = loanDocumentService;
         }
 
         [HttpGet("products")]
@@ -103,7 +105,14 @@ namespace LoanRequestAPI.Controllers.Loans
         }
 
         [HttpPost("applications/{id:guid}/documents")]
-        
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadDocument(Guid id, [FromForm] LoanDocumentUploadRequest request)
+        {
+            var result = await _loanDocumentService.ProcessLoanDocument(id, request);
+            if(!result.IsSuccess) return BadRequest(result);
+
+            return Ok(result);
+        }
 
     }
 }

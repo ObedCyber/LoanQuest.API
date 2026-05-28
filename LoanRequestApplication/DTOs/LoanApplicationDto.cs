@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 
 namespace LoanRequestApplication.DTOs
 {
@@ -120,5 +121,30 @@ namespace LoanRequestApplication.DTOs
         public string ApplicationNumber { get; set; } = null!;
         public string Status { get; set; } = null!;
         public DateTime DeletedAt { get; set; }
+    }
+
+    public class LoanDocumentUploadRequest
+    {
+        [Required(ErrorMessage = "Please select a valid file to upload.")]
+        public required IFormFile File { get; set; }
+
+        [Required(ErrorMessage = "Document type code is required to map against the application checklist.")]
+        [StringLength(50)]
+        public required string DocumentTypeCode { get; set; } // e.g., "PAYSLIP", "BANK_STMT", "ID_PROOOF"
+
+        [Required]
+        public required string FileName { get; set; }
+    }
+
+    public class LoanDocumentUploadResponse : BaseResponse
+    {
+
+    }
+
+    public class BlobUploadResult
+    {
+        public bool IsSuccess { get; set; }
+        public string? StoragePath { get; set; }
+        public string? ErrorMessage { get; set; }
     }
 }

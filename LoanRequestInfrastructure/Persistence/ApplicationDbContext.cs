@@ -25,6 +25,7 @@ namespace LoanRequestInfrastructure.Persistence
         public DbSet<EligibilityChecks> EligibilityChecks { get; set; }
         public DbSet<LoanProducts> LoanProducts { get; set; }
         public DbSet<LoanApplication> LoanApplications { get; set; }
+        public DbSet<LoanDocument> LoanDocuments { get; set; }
 
         public DbSet<DocumentRequirement> DocumentRequirements { get; set; }
         public DbSet<ApplicationDocumentChecklist> ApplicationDocumentChecklists { get; set; }
@@ -112,6 +113,26 @@ namespace LoanRequestInfrastructure.Persistence
                     .OnDelete(DeleteBehavior.NoAction); // Prevents cascade delete cycles
 
                 entity.HasOne(p => p.LoanProduct);
+            });
+
+            builder.Entity<LoanDocument>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasIndex(e => e.LoanApplicationId);
+                entity.HasIndex(e => e.ApplicantId);
+
+                entity.HasQueryFilter(e => !e.IsDeleted);
+
+                entity.HasOne(d => d.LoanApplication)
+                      .WithMany() 
+                      .HasForeignKey(d => d.LoanApplicationId)
+                      .OnDelete(DeleteBehavior.Cascade); 
+
+                entity.HasOne(d => d.Applicant)
+                      .WithMany()
+                      .HasForeignKey(d => d.ApplicantId)
+                      .OnDelete(DeleteBehavior.NoAction); 
             });
 
             builder.Entity<DocumentRequirement>()
