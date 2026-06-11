@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using AutoMapper;
+﻿using AutoMapper;
 using LoanRequestApplication.DTOs;
 using LoanRequestApplication.Interfaces.Repositories;
 using LoanRequestApplication.Interfaces.Services;
@@ -44,11 +38,11 @@ namespace LoanRequestInfrastructure.Services.Loans
             _eligibilityChecksRepository = eligibilityChecksRepository;
             _mapper = mapper;
         }
-     
+
         public async Task<EligibilityResultResponse> Calculate(EligibilityRequestDto request)
-        {            
-           // if (applicant == null) return new EligibilityResultResponse { IsSuccess = false, Message = "Applicant profile does not exist.Please complete your profile." };
-           if(CurrentApplicantId == Guid.Empty) return new EligibilityResultResponse { IsSuccess = false, Message = "Applicant profile does not exist.Please complete your profile." };
+        {
+            // if (applicant == null) return new EligibilityResultResponse { IsSuccess = false, Message = "Applicant profile does not exist.Please complete your profile." };
+            if (CurrentApplicantId == Guid.Empty) return new EligibilityResultResponse { IsSuccess = false, Message = "Applicant profile does not exist.Please complete your profile." };
             var applicant = await _applicantRepository.GetApplicantByUserIdAsync(CurrentUserId!);
             // var applicantEmploymentDetails = await _employmentRepository.GetApplicantEmploymentByApplicantIdAsync(CurrentApplicantId);
             var applicantEmploymentDetails = applicant!.Employment;
@@ -118,8 +112,8 @@ namespace LoanRequestInfrastructure.Services.Loans
             var dto = _mapper.Map<IEnumerable<EligibilityResponseDto>>(checks);
             return dto;
         }
-        
-        private static EligibilityResponseDto RunCalculation(
+
+        internal static EligibilityResponseDto RunCalculation(
             decimal NetMonthlyIncome,
             decimal grossSalary,
             decimal monthlyObligations,
@@ -176,7 +170,7 @@ namespace LoanRequestInfrastructure.Services.Loans
             response.MaxMonthlyRepayment = Math.Round(maxMonthlyRepayment, 2);
 
             // Present Value of the loan = PMT × [(1 - (1 + r)^-n) / r]
-            double monthlyRate = (double)(product.InterestRatePercent / 12 / 100); 
+            double monthlyRate = (double)(product.InterestRatePercent / 12 / 100);
             double n = effectiveTenor;
             double pmt = (double)maxMonthlyRepayment;
 

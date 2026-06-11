@@ -5,6 +5,10 @@
 	  <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+	  <GenerateDocumentationFile>true</GenerateDocumentationFile>
+	  <DocumentationFile>LoanRequestAPI.xml</DocumentationFile>
+	  <NoWarn>(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

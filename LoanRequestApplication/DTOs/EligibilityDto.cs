@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace LoanRequestApplication.DTOs
 {
@@ -25,7 +20,7 @@ namespace LoanRequestApplication.DTOs
     {
         public EligibilityResponseDto? Data { get; set; }
     }
-    
+
 
     public class EligibilityResponseDto
     {
@@ -53,7 +48,7 @@ namespace LoanRequestApplication.DTOs
         public bool IsEligible { get; set; }
         public decimal MaxEligibleAmount { get; set; }
         public decimal MonthlyRepayment { get; set; }
-        public string RiskRating { get; set; }
+        public string? RiskRating { get; set; }
         public List<string> RejectionReasons { get; set; } = new();
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
@@ -61,8 +56,8 @@ namespace LoanRequestApplication.DTOs
     }
     public class RejectionReason
     {
-        public string Code { get; set; }
-        public string Message { get; set; }
+        public string? Code { get; set; }
+        public string? Message { get; set; }
 
         // Static factory methods so rejection reasons are 
         public static RejectionReason InsufficientDisposableIncome() => new()

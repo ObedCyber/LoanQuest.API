@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using LoanRequestApplication.Interfaces.Repositories;
 using LoanRequestApplication.Interfaces.Services;
@@ -68,7 +69,7 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Loan Request API", Version = "v1" });
 
-    // 1. Define the Security Scheme
+    // Define the Security Scheme
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -79,7 +80,17 @@ builder.Services.AddSwaggerGen(options =>
         Description = "JWT Authorization header using the Bearer scheme. \r\n\r\n Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer 1safsfsdfdfd\""
     });
 
-    // 2. Make Swagger use that scheme globally
+    // 2. SAFE DEFENSIVE XML LOADING BLOCK
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+
+    // Check if the file actually exists before telling Swagger to look for it!
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+
+    // Make Swagger use that scheme globally
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -95,7 +106,6 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
-
 // Add JWt Service
 builder.Services.AddAuthentication(options =>
 {
@@ -118,22 +128,63 @@ builder.Services.AddAuthentication(options =>
 });
 builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000") // Put your frontend URLs here
+              .AllowAnyHeader()                                            // Allows headers like Authorization (JWT tokens) or Content-Type
+              .AllowAnyMethod()                                            // Allows GET, POST, PUT, DELETE, etc.
+              .AllowCredentials();                                         // Crucial if passing HTTP-Only cookies or Refresh Tokens
+    });
+});
+
 
 var app = builder.Build();
-
+app.UseDeveloperExceptionPage();
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Loan Request API v1");
+    c.RoutePrefix = string.Empty;
+});
+
 
 app.UseHttpsRedirection();
-
+app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
 
 
 app.MapControllers();
+
+
+// Automatically apply pending migrations on application startup
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+
+        // Check if there are any migrations that haven't been applied yet
+        if ((await context.Database.GetPendingMigrationsAsync()).Any())
+        {
+            await context.Database.MigrateAsync();
+            Console.WriteLine("Database migrations applied successfully in the cloud!");
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while migrating the database on startup.");
+        // Optional: Fail the startup if the database is out of sync
+        throw;
+    }
+}
+
 
 app.Run();

@@ -1,0 +1,583 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>LoanRequestAPI</name>
+    </assembly>
+    <members>
+        <member name="T:LoanRequestAPI.Controllers.Applicants.ApplicantsController">
+             <summary>
+             Manages the applicant's personal profile, employment details,
+             financial information, and identity verification (KYC).
+             </summary>
+             <remarks>
+             All endpoints are scoped to the currently authenticated user.
+             You cannot access or modify another applicant's profile.
+            
+             **Recommended setup order before running an eligibility check:**
+             1. POST /api/applicants/me — Create your profile
+             2. POST /api/applicants/me/employment — Add employment details
+             3. POST /api/applicants/me/financials — Add financial obligations
+             4. POST /api/applicants/me/kyc/bvn — Verify your BVN
+             </remarks>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Applicants.ApplicantsController.RegisterProfile(LoanRequestApplication.DTOs.ProfileRequest)">
+             <summary>
+             Create your applicant profile.
+             </summary>
+             <remarks>
+             This is the **first step** after registering and logging in.
+             Creates your personal profile linked to your user account.
+            
+             Your profile stores your personal information such as your name,
+             date of birth, residential address, and state of origin.
+             This information is used during the loan eligibility check and
+             for KYC verification.
+            
+             **You can only have one profile per account.**
+             If a profile already exists, use <c>PUT /api/applicants/me</c> to update it.
+            
+             **Example Request:**
+             ```json
+             {
+               "firstName": "John",
+               "lastName": "Doe",
+               "dateOfBirth": "1988-05-15",
+               "gender": "Male",
+               "maritalStatus": "Married",
+               "residentialAddress": "12 Admiralty Way, Lekki Phase 1",
+               "residentialState": "Lagos",
+               "stateOfOrigin": "Anambra"
+             }
+             ```
+             </remarks>
+             <param name="request">Your personal information to register as an applicant profile.</param>
+             <response code="200">Profile created successfully. Returns the new profile with a generated applicant ID.</response>
+             <response code="400">Profile already exists for this account, or required fields are missing.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Applicants.ApplicantsController.GetApplicantProfile">
+             <summary>
+             Get your current applicant profile.
+             </summary>
+             <remarks>
+             Returns your full applicant profile including:
+             - Personal information (name, DOB, address)
+             - KYC verification status for each check (Email, Phone, BVN, NIN)
+             - Employment details (if added)
+             - Financial obligations (if added)
+             - Profile completeness percentage
+            
+             Use this endpoint to check what information is still missing
+             before running an eligibility check or submitting an application.
+            
+             The <c>profileCompleteness</c> field shows your progress as a percentage.
+             A minimum of **80%** is required before running an eligibility check.
+             **100%** is required before submitting a loan application.
+             </remarks>
+             <response code="200">Profile found and returned successfully.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">No profile found for this account. Use POST /api/applicants/me to create one.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Applicants.ApplicantsController.UpdateProfile(LoanRequestApplication.DTOs.ProfileUpdateRequest)">
+             <summary>
+             Update your applicant profile.
+             </summary>
+             <remarks>
+             Updates your existing personal profile. Only the fields you include
+             in the request body will be updated — fields you leave out remain unchanged.
+            
+             **Commonly updated fields:**
+             - Residential address (if you have moved)
+             - Marital status
+             - Phone number
+            
+             **Note:** Your date of birth cannot be changed after BVN verification
+             because it is cross-checked against the BVN record.
+            
+             After a successful update, your profile completeness percentage
+             is automatically recalculated and returned.
+             </remarks>
+             <param name="request">The profile fields you want to update. Only include fields you wish to change.</param>
+             <response code="200">Profile updated successfully. Returns the updated profile with recalculated completeness.</response>
+             <response code="400">Invalid update data or update violates a business rule.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">No profile found. Create one first using POST /api/applicants/me.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Applicants.ApplicantsController.AddEmploymentDetails(LoanRequestApplication.DTOs.EmploymentRequest)">
+             <summary>
+             Add your employment details.
+             </summary>
+             <remarks>
+             Saves your current employment information to your profile.
+             This is **required** before running an eligibility check because
+             your monthly gross salary is the primary input to the eligibility engine.
+            
+             **What this information is used for:**
+             - <c>monthlyGrossSalary</c> — used to calculate your net income, DSR cap, and maximum eligible loan amount
+             - <c>employmentStartDate</c> — used to determine employment stability
+             - <c>employerName</c> — cross-referenced during document verification
+            
+             **Example Request:**
+             ```json
+             {
+               "employmentType": "Employed",
+               "employerName": "GTBank Plc",
+               "jobTitle": "Software Engineer",
+               "monthlyGrossSalary": 500000,
+               "employmentStartDate": "2019-01-15",
+               "salaryAccountBank": "GTBank",
+               "salaryAccountNumber": "0123456789"
+             }
+             ```
+            
+             **Supported Employment Types:** Employed, Self-Employed, Contract, Retired
+             </remarks>
+             <param name="request">Your current employer and salary details.</param>
+             <response code="200">Employment details saved successfully. Profile completeness is recalculated.</response>
+             <response code="400">Invalid request data or required salary fields are missing.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Applicants.ApplicantsController.AddFinancialDetails(LoanRequestApplication.DTOs.FinancialsRequest)">
+             <summary>
+             Add your monthly financial obligations.
+             </summary>
+             <remarks>
+             Saves your existing monthly financial commitments to your profile.
+             This is **required** before running an eligibility check.
+            
+             **Why this matters:**
+             The eligibility engine deducts your existing obligations from your
+             net income to calculate your true disposable income. This determines
+             the maximum monthly repayment you can afford and directly affects
+             how much you can borrow.
+            
+             > Disposable Income = Net Monthly Income − Monthly Obligations
+            
+             **If you have no existing loans or commitments**, submit this endpoint
+             with <c>monthlyObligations: 0</c>. The record must exist for the
+             eligibility check to proceed.
+            
+             **Example Request:**
+             ```json
+             {
+               "monthlyObligations": 80000,
+               "otherMonthlyIncome": 50000
+             }
+             ```
+            
+             - <c>monthlyObligations</c> — total of all existing loan repayments per month
+             - <c>otherMonthlyIncome</c> — any additional income (rent, investments, freelance). Optional.
+             </remarks>
+             <param name="request">Your existing monthly financial obligations and any additional income.</param>
+             <response code="200">Financial details saved successfully. Profile completeness is recalculated.</response>
+             <response code="400">Invalid request data or required fields are missing.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Applicants.ApplicantsController.VerifyBVN(LoanRequestApplication.DTOs.BvnKycRequest)">
+             <summary>
+             Verify your Bank Verification Number (BVN).
+             </summary>
+             <remarks>
+             Submits your BVN to a licensed identity verification provider (NIBSS via gateway)
+             for cross-checking against your registered profile details.
+            
+             **How it works:**
+             1. Your BVN and date of birth are sent to the verification provider
+             2. The provider returns the name and DOB linked to that BVN
+             3. The returned details are cross-checked against your profile
+             4. If they match, your KYC status updates to **Verified**
+             5. If they do not match, the attempt is logged and you can retry
+            
+             **Important:**
+             - BVN verification is required before your profile can reach 100% completeness
+             - A verified BVN is required before submitting a loan application
+             - Your raw BVN is never stored — only the verification result is saved
+            
+             **Example Request:**
+             ```json
+             {
+               "bvn": "12345678901",
+               "dateOfBirth": "1988-05-15"
+             }
+             ```
+             </remarks>
+             <param name="request">Your 11-digit BVN and date of birth for cross-checking.</param>
+             <response code="200">
+             BVN verification processed. Check <c>isSuccess</c> in the response:
+             - <c>true</c> — BVN verified, KYC status updated
+             - <c>false</c> — Verification failed (name or DOB mismatch)
+             </response>
+             <response code="400">Invalid BVN format, missing date of birth, or no profile found.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="T:LoanRequestAPI.Controllers.Auth.AuthController">
+            <summary>
+            Handles user identity verification, secure authentication, session management, and credential recovery for LoanQuest.
+            </summary>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Auth.AuthController.Register(LoanRequestInfrastructure.Services.Auth.RegisterRequestDto)">
+            <summary>
+            Register a new user account.
+            </summary>
+            <remarks>
+            Creates a new account in the system and automatically sends a verification code (OTP) to the user's email so they can activate it.
+            </remarks>
+            <param name="request">The user's sign-up information.</param>
+            <response code="200">Account created successfully and verification email sent.</response>
+            <response code="400">Registration failed. The email might already be taken, or the password is too weak.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Auth.AuthController.Login(LoanRequestInfrastructure.Services.Auth.LoginRequestDto)">
+            <summary>
+            Authenticate user credentials and issue active secure access tokens.
+            </summary>
+            <remarks>
+            On a valid match, returns an ephemeral JWT Access Token (15-minute validity) passed via JSON body payloads, 
+            along with a highly protected, long-lived Refresh Token intended for secure client-side preservation.
+            </remarks>
+            <param name="request">Username/Email credentials alongside standard password inputs.</param>
+            <response code="200">Authentication successful; access token and refresh structures returned.</response>
+            <response code="400">Invalid authentication credentials supplied, or account currently locked out.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Auth.AuthController.RotateTokens(System.String,System.String)">
+            <summary>
+            Refresh an expired login session using a refresh token.
+            </summary>
+            <remarks>
+            Takes the user's current refresh token and swaps it for a brand new access token and refresh token. This keeps the user logged in without forcing them to type their password again. If an old token is reused, the system will block it for security.
+            </remarks>
+            <param name="oldrefreshToken">The current refresh token string.</param>
+            <param name="userId">The ID of the user requesting the new token.</param>
+            <response code="200">Token swapped successfully. Returns a new set of tokens.</response>
+            <response code="400">Token exchange denied. The token might be expired, invalid, or already used.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Auth.AuthController.Logout">
+            <summary>
+            Log the user out and end their session.
+            </summary>
+            <remarks>
+            Deletes the current active session in the database and blacklists the tokens so they can never be used again.
+            </remarks>
+            <response code="200">Logged out successfully. Tokens are now invalid.</response>
+            <response code="401">Unauthorized. You must pass a valid JWT token to log out.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Auth.AuthController.ForgotPassword(LoanRequestInfrastructure.Services.Auth.ForgotPasswordRequest)">
+            <summary>
+            Request a password reset link.
+            </summary>
+            <remarks>
+            Checks if the email exists. If it does, it sends the new tokens in the response. Temporarily because Email channels have not been setup
+            </remarks>
+            <param name="request">The email address of the account needing a password reset.</param>
+            <response code="200">Request processed. If the email exists, a reset link was sent.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Auth.AuthController.ResetPassword(LoanRequestInfrastructure.Services.Auth.ResetPasswordRequest)">
+            <summary>
+            Complete the password reset using the token from the email.
+            </summary>
+            <remarks>
+            Takes the security token sent to the user's email along with their new password. If the token is valid and hasn't expired, it updates the account with the new password.
+            </remarks>
+            <param name="request">The secure token from the email and the new password choice.</param>
+            <response code="200">Password updated successfully. The user can now log in with their new password.</response>
+            <response code="400">Failed to update password. The token might be expired or invalid.</response>
+        </member>
+        <member name="T:LoanRequestAPI.Controllers.Loans.LoansController">
+            <summary>
+            Handles all loan-related operations including products, eligibility checks,
+            applications, and document management.
+            </summary>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.GetLoanProducts">
+             <summary>
+             Get all available loan products.
+             </summary>
+             <remarks>
+             Returns the full list of active loan products the applicant can apply for.
+             Each product includes its interest rate, minimum/maximum amount,
+             allowed tenor range, and DSR cap.
+            
+             Use the returned <c>loanProductId</c> when running an eligibility check.
+            
+             **Example Response:**
+             ```json
+             {
+               "products": [
+                 {
+                   "id": "uuid",
+                   "name": "Personal Loan",
+                   "interestRatePercent": 18.0,
+                   "minAmount": 50000,
+                   "maxAmount": 5000000,
+                   "minTenorMonths": 3,
+                   "maxTenorMonths": 60
+                 }
+               ]
+             }
+             ```
+             </remarks>
+             <response code="200">List of active loan products returned successfully.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.CalculateEligibility(LoanRequestApplication.DTOs.EligibilityRequestDto)">
+             <summary>
+             Run an eligibility check to find out how much you can borrow.
+             </summary>
+             <remarks>
+             This is the **first step** before creating a loan application.
+             It calculates your maximum eligible loan amount based on:
+             - Your monthly gross salary (from your employment profile)
+             - Your existing monthly obligations (from your financial profile)
+             - The selected loan product's DSR and LTI rules
+             - Your age relative to retirement age (60)
+            
+             **No credit bureau check is triggered here.** This is a soft pre-qualification only.
+            
+             The result includes:
+             - Your eligible amount range (min and max)
+             - A recommended amount
+             - The monthly repayment for the recommended amount
+             - A risk rating (Low / Medium / High / Decline)
+            
+             The eligibility check result is **valid for 24 hours**.
+             Save the returned <c>eligibilityCheckId</c> — you will need it to create a loan application.
+            
+             **Prerequisites:** Your profile must have employment and financial details saved before running this check.
+            
+             </remarks>
+             <param name="request">The loan product, desired amount, and tenor you want to check.</param>
+             <response code="200">Eligibility check completed. Check <c>isEligible</c> in the response to see the result.</response>
+             <response code="400">Missing profile data, inactive product, or tenor out of range.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.GetEligibilitycheck(System.Guid)">
+             <summary>
+             Get the result of a previous eligibility check by its ID.
+             </summary>
+             <remarks>
+             Retrieves a saved eligibility check result using the <c>eligibilityCheckId</c>
+             returned when the check was originally run.
+            
+             Useful for reviewing a previous result before creating an application,
+             or for confirming that a check is still within its 24-hour validity window.
+            
+             You can only retrieve checks that belong to your own account.
+             </remarks>
+             <param name="id">The unique ID of the eligibility check to retrieve.</param>
+             <response code="200">Eligibility check found and returned successfully.</response>
+             <response code="400">Check not found or does not belong to your account.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.GetAllEligibilityChecksForApplicant">
+             <summary>
+             Get all eligibility checks you have ever run.
+             </summary>
+             <remarks>
+             Returns every eligibility check associated with your account,
+             ordered from most recent to oldest.
+            
+             This is useful for reviewing past pre-qualifications and checking
+             which ones are still within their 24-hour validity window.
+            
+             Each result includes the check date, loan product, eligible range,
+             and whether the check has expired.
+             </remarks>
+             <response code="200">
+             Returns a list of your eligibility checks.
+             If no checks exist, returns an empty list with <c>checkCount: 0</c>.
+             </response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.SubmitLoanApplication(LoanRequestApplication.DTOs.LoanApplicationRequestDto)">
+             <summary>
+             Create a new loan application draft.
+             </summary>
+             <remarks>
+             This is the **second step** after running a successful eligibility check.
+            
+             Creates a loan application in **Draft** status using the approved range
+             from your eligibility check. The application is not submitted to loan
+             officers yet — you can still edit it and upload documents.
+            
+             **Rules:**
+             - The <c>eligibilityCheckId</c> must belong to your account
+             - The check must not have expired (valid for 24 hours)
+             - The <c>requestedAmount</c> must be within the eligible range from the check
+             - The monthly repayment for the chosen amount and tenor must not exceed your DSR ceiling
+            
+             A document checklist is automatically generated based on the loan product's requirements.
+             Upload all mandatory documents before submitting.
+            
+             **Example Request:**
+             ```json
+             {
+               "eligibilityCheckId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+               "requestedAmount": 1500000,
+               "tenorMonths": 24,
+               "loanPurpose": "Home renovation"
+             }
+             ```
+             </remarks>
+             <param name="request">Eligibility check reference, desired amount, tenor, and loan purpose.</param>
+             <response code="200">Draft application created successfully. Returns the application number and document checklist.</response>
+             <response code="400">Eligibility check expired, amount out of range, or missing profile data.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.GetLoanApplicationsForApplicant">
+             <summary>
+             Get all loan applications for your account.
+             </summary>
+             <remarks>
+             Returns a summary list of every loan application associated with your account,
+             including Draft, Submitted, Under Review, Approved, and Rejected applications.
+            
+             Use <c>GET /api/loans/applications/{id}</c> to retrieve the full detail
+             of a specific application including its document checklist.
+             </remarks>
+             <response code="200">
+             Returns your applications with a total count.
+             Returns <c>totalCount: 0</c> and an empty list if no applications exist.
+             </response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.GetApplicationDetail(System.Guid)">
+             <summary>
+             Get the full detail of a specific loan application.
+             </summary>
+             <remarks>
+             Returns the complete application record including:
+             - Loan amount, tenor, interest rate, and repayment figures
+             - Current status and status history
+             - The document checklist with upload status for each required document
+            
+             You can only retrieve applications that belong to your account.
+             </remarks>
+             <param name="id">The unique ID of the loan application.</param>
+             <response code="200">Application found and returned with full details.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">Application not found or does not belong to your account.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.UpdateLoanDraft(System.Guid,LoanRequestApplication.DTOs.LoanApplicationUpdateDto)">
+             <summary>
+             Update a loan application that is still in Draft status.
+             </summary>
+             <remarks>
+             Allows you to change the requested amount, tenor, or loan purpose
+             on a Draft application before submitting it.
+            
+             **Rules:**
+             - Only applications in **Draft** status can be updated
+             - The new amount must still be within the eligible range from the original eligibility check
+             - If the tenor changes, the new monthly repayment must not exceed your DSR ceiling
+             - Repayment figures are automatically recalculated after any change
+            
+             All three fields are optional — only send the ones you want to change.
+            
+             **Example Request:**
+             ```json
+             {
+               "requestedAmount": 1200000,
+               "tenorMonths": 18,
+               "loanPurpose": "School fees"
+             }
+             ```
+             </remarks>
+             <param name="id">The unique ID of the Draft application to update.</param>
+             <param name="request">The fields you want to update. All fields are optional.</param>
+             <response code="200">Application updated successfully. Returns the recalculated repayment figures.</response>
+             <response code="400">Application is not in Draft status, amount out of range, or new repayment exceeds DSR limit.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">Application not found or does not belong to your account.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.CancelDraftApplication(System.Guid)">
+             <summary>
+             Cancel and delete a Draft loan application.
+             </summary>
+             <remarks>
+             Permanently removes a loan application that is still in **Draft** status.
+            
+             **This action cannot be undone.**
+            
+             Only Draft applications can be cancelled. Applications that have already
+             been submitted cannot be deleted.
+             </remarks>
+             <param name="id">The unique ID of the Draft application to cancel.</param>
+             <response code="200">Application cancelled and removed successfully.</response>
+             <response code="400">Application is not in Draft status and cannot be cancelled.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">Application not found or does not belong to your account.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.UploadDocument(System.Guid,LoanRequestApplication.DTOs.LoanDocumentUploadRequest)">
+             <summary>
+             Upload a document for a specific checklist item on a loan application.
+             </summary>
+             <remarks>
+             Uploads a file to satisfy one item on the application's document checklist.
+             The checklist is automatically created when a Draft application is first created
+             and is based on the requirements of the selected loan product.
+            
+             **How to use:**
+             Send the request as <c>multipart/form-data</c> with two fields:
+             - <c>file</c> — the actual document file
+             - <c>documentTypeCode</c> — the code of the checklist item you are satisfying
+               (e.g. <c>PAYSLIP</c>, <c>BANK_STMT</c>, <c>EMP_LETTER</c>, <c>VALID_ID</c>)
+            
+             **File Rules:**
+             - Accepted formats: PDF, JPG, PNG
+             - Maximum file size: 5MB
+             - File name is sanitised on upload — a secure name is generated automatically
+            
+             **Re-uploading:** If a loan officer rejects a document, upload a new file
+             for the same <c>documentTypeCode</c>. The old file is automatically replaced.
+            
+             **When can you upload?**
+             Documents can only be uploaded while the application is in
+             **Draft** or **More Info Required** status.
+            
+             The checklist item status will update to <c>Uploaded</c> after a successful upload.
+             Once all mandatory documents are uploaded, the application is ready to submit.
+             </remarks>
+             <param name="id">The unique ID of the loan application.</param>
+             <param name="request">
+             Multipart form containing:
+             - <c>file</c>: the document file (PDF, JPG, or PNG, max 5MB)
+             - <c>documentTypeCode</c>: the checklist item code this file satisfies
+             </param>
+             <response code="200">Document uploaded successfully. Checklist item status updated to Uploaded.</response>
+             <response code="400">
+             Upload failed. Possible reasons:
+             - Application is not in Draft or More Info Required status
+             - Document type code is not on this application's checklist
+             - File type is not allowed (must be PDF, JPG, or PNG)
+             - File exceeds the size limit on checklist
+             - No file was provided
+             </response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">Application not found or does not belong to your account.</response>
+        </member>
+        <member name="M:LoanRequestAPI.Controllers.Loans.LoansController.DeleteDocument(System.Guid,System.Guid)">
+             <summary>
+             Remove an uploaded document from a Draft application.
+             </summary>
+             <remarks>
+             Permanently deletes an uploaded document from both the database
+             and Azure Blob Storage. The checklist item is reset back to **Pending**.
+            
+             **Rules:**
+             - Only works on applications in **Draft** status
+             - The document must belong to this application
+            
+             Use this if you uploaded the wrong file and want to start over for that
+             document type. After deleting, upload the correct file using
+             <c>POST /api/loans/applications/{id}/documents</c>.
+            
+             **This action cannot be undone.** The file is permanently deleted from storage.
+             </remarks>
+             <param name="id">The unique ID of the loan application.</param>
+             <param name="docId">The unique ID of the document to delete (returned when the document was uploaded).</param>
+             <response code="200">Document deleted successfully. Checklist item reset to Pending.</response>
+             <response code="400">Application is not in Draft status or document does not belong to this application.</response>
+             <response code="401">Unauthorized. A valid JWT token is required.</response>
+             <response code="404">Application or document not found.</response>
+        </member>
+    </members>
+</doc>
